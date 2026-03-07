@@ -1,0 +1,12 @@
+bin/
+obj/
+dist/
+.godot/
+.tools/
+__pycache__/
+*.user
+*.suo
+*.tmp
+*.log
+# local developer config (never commit)
+/.env

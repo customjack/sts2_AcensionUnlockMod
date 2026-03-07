@@ -1,0 +1,7 @@
+{
+  "pck_name": "AscensionUnlockMod",
+  "name": "AscensionUnlockMod",
+  "author": "local-dev",
+  "description": "Adds a main-menu settings popup to set ascension unlock level for all characters.",
+  "version": "0.1.0"
+}

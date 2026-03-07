@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STS2 Log Viewer</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <h1>STS2 Log Viewer</h1>
+        <p id="status" class="status">Connecting...</p>
+      </header>
+
+      <section class="controls">
+        <label class="control">
+          <span>Search</span>
+          <input id="searchInput" type="text" placeholder="Filter lines (Ctrl+F style)" />
+        </label>
+        <label class="control checkbox">
+          <input id="caseSensitive" type="checkbox" />
+          <span>Case-sensitive</span>
+        </label>
+        <label class="control checkbox">
+          <input id="autoScroll" type="checkbox" checked />
+          <span>Auto-scroll</span>
+        </label>
+        <button id="clearFilter" type="button">Clear Filter</button>
+        <button id="pauseResume" type="button">Pause</button>
+        <button id="refreshNow" type="button">Refresh</button>
+      </section>
+
+      <section class="meta">
+        <p><strong>File:</strong> <span id="filePath">-</span></p>
+        <p><strong>Stats:</strong> <span id="stats">-</span></p>
+      </section>
+
+      <section class="log-wrap">
+        <pre id="logOutput" class="log-output"></pre>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

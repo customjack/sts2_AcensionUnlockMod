@@ -1,0 +1,8 @@
+name: sts2-modding
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - dotnet-sdk=9.0
+  - curl
+  - unzip
