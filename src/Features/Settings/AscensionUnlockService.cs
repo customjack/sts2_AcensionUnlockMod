@@ -30,6 +30,17 @@ internal static class AscensionUnlockService
     public const int MaxAscension = 10;
 
     /// <summary>
+    /// Returns playable characters (excluding random-select pseudo character).
+    /// </summary>
+    public static IReadOnlyList<CharacterModel> GetEditableCharacters()
+    {
+        var randomCharacterId = ModelDb.GetId<RandomCharacter>();
+        return ModelDb.AllCharacters
+            .Where(character => character.Id != randomCharacterId)
+            .ToList();
+    }
+
+    /// <summary>
     /// Returns one editable ascension row per playable character.
     /// </summary>
     public static IReadOnlyList<CharacterAscensionSetting> GetCharacterSettings()
@@ -86,9 +97,52 @@ internal static class AscensionUnlockService
     }
 
     /// <summary>
+    /// Returns one character's current ascension level as represented in progress save.
+    /// </summary>
+    public static int GetCurrentCharacterAscensionLevel(ModelId characterId)
+    {
+        try
+        {
+            var progress = SaveManager.Instance.Progress;
+            return ClampLevel(progress.GetStatsForCharacter(characterId)?.MaxAscension ?? MinAscension);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("InitProfileId", StringComparison.Ordinal))
+        {
+            Log.Warn($"[AscensionUnlockMod] Character ascension level requested before profile init for '{characterId}'.");
+            return MaxAscension;
+        }
+    }
+
+    /// <summary>
+    /// Returns the currently selected multiplayer ascension level.
+    /// </summary>
+    public static int GetCurrentMultiplayerAscensionLevel()
+    {
+        try
+        {
+            var progress = SaveManager.Instance.Progress;
+            var selected = progress.PreferredMultiplayerAscension;
+            if (selected <= MinAscension && progress.MaxMultiplayerAscension > MinAscension)
+            {
+                selected = progress.MaxMultiplayerAscension;
+            }
+
+            return ClampLevel(selected);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("InitProfileId", StringComparison.Ordinal))
+        {
+            Log.Warn("[AscensionUnlockMod] Multiplayer ascension level requested before profile init.");
+            return MaxAscension;
+        }
+    }
+
+    /// <summary>
     /// Applies requested per-character levels, reveals ascension epochs if needed, and saves progress.
     /// </summary>
-    public static bool TryApplyLevels(IReadOnlyDictionary<ModelId, int> requestedLevels, out string message)
+    public static bool TryApplyLevels(
+        IReadOnlyDictionary<ModelId, int> requestedLevels,
+        int requestedMultiplayerLevel,
+        out string message)
     {
         try
         {
@@ -104,7 +158,6 @@ internal static class AscensionUnlockService
 
             var revealedEpochs = 0;
             var updatedCharacters = 0;
-            var maxAppliedLevel = MinAscension;
 
             foreach (var character in characters)
             {
@@ -112,7 +165,6 @@ internal static class AscensionUnlockService
                     ? levelFromUi
                     : progress.GetStatsForCharacter(character.Id)?.MaxAscension ?? MinAscension;
                 var clamped = ClampLevel(requested);
-                maxAppliedLevel = Math.Max(maxAppliedLevel, clamped);
 
                 var stats = progress.GetOrCreateCharacterStats(character.Id);
                 if (stats.MaxAscension != clamped || stats.PreferredAscension != clamped)
@@ -130,11 +182,22 @@ internal static class AscensionUnlockService
                 }
             }
 
-            progress.MaxMultiplayerAscension = maxAppliedLevel;
-            progress.PreferredMultiplayerAscension = maxAppliedLevel;
+            var multiplayerLevel = ClampLevel(requestedMultiplayerLevel);
+            var multiplayerChanged =
+                progress.MaxMultiplayerAscension != multiplayerLevel ||
+                progress.PreferredMultiplayerAscension != multiplayerLevel;
+            if (multiplayerChanged)
+            {
+                updatedCharacters++;
+            }
+
+            progress.MaxMultiplayerAscension = multiplayerLevel;
+            progress.PreferredMultiplayerAscension = multiplayerLevel;
             saveManager.SaveProgressFile();
 
-            message = $"Applied {updatedCharacters} updates across {characters.Count} characters. Revealed {revealedEpochs} ascension epochs.";
+            message =
+                $"Applied {updatedCharacters} updates across {characters.Count} characters " +
+                $"and multiplayer A{multiplayerLevel}. Revealed {revealedEpochs} ascension epochs.";
             return true;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("InitProfileId", StringComparison.Ordinal))
@@ -152,12 +215,13 @@ internal static class AscensionUnlockService
     }
 
     /// <summary>
-    /// Returns playable characters (excluding random-select pseudo character).
+    /// Resets all character and multiplayer ascension controls to fully unlocked defaults.
     /// </summary>
-    private static IEnumerable<CharacterModel> GetEditableCharacters()
+    public static bool TryRestoreDefaults(out string message)
     {
-        var randomCharacterId = ModelDb.GetId<RandomCharacter>();
-        return ModelDb.AllCharacters.Where(character => character.Id != randomCharacterId);
+        var characterLevels = GetEditableCharacters()
+            .ToDictionary(character => character.Id, _ => MaxAscension);
+        return TryApplyLevels(characterLevels, MaxAscension, out message);
     }
 
     /// <summary>

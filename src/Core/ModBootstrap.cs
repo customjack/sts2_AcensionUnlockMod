@@ -1,4 +1,5 @@
 using HarmonyLib;
+using AscensionUnlockMod.Features.Settings;
 using MegaCrit.Sts2.Core.Logging;
 
 namespace AscensionUnlockMod.Core;
@@ -20,15 +21,13 @@ public static class ModBootstrap
     {
         if (_initialized)
         {
-            Log.Info("[AscensionUnlockMod] ModBootstrap.Initialize skipped (already initialized).");
             return;
         }
 
         _initialized = true;
-        Log.Info("[AscensionUnlockMod] Mod bootstrap starting.");
+        Log.Info("[AscensionUnlockMod] Mod loaded.");
 
         _harmony = new Harmony(HarmonyId);
         _harmony.PatchAll();
-        Log.Info($"[AscensionUnlockMod] Harmony patches applied with id '{HarmonyId}'.");
     }
 }

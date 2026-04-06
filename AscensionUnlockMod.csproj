@@ -24,6 +24,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../ModManagerSettings/ModManagerSettings.csproj" />
+  </ItemGroup>
+
   <Target Name="ValidateSts2InstallDir" BeforeTargets="ResolveReferences">
     <Error Condition="'$(Sts2InstallDir)' == ''" Text="Sts2InstallDir is not set. Define STS2_INSTALL_DIR in .env or pass -p:Sts2InstallDir=/path/to/Slay the Spire 2." />
     <Error Condition="!Exists('$(Sts2InstallDir)/data_sts2_windows_x86_64/sts2.dll')" Text="Could not find sts2.dll under '$(Sts2InstallDir)/data_sts2_windows_x86_64'. Check STS2_INSTALL_DIR in .env." />

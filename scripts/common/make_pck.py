@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -50,10 +51,21 @@ def resolve_image_path(project_root: Path) -> Path | None:
     return None
 
 
-def generate_import_artifacts(godot_exe: str, mod_name: str, source_image: Path) -> tuple[Path, Path, str] | None:
+def read_manifest(manifest_path: Path) -> dict:
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def resolve_mod_id(manifest: dict) -> str:
+    mod_id = (manifest.get("id") or manifest.get("pck_name") or manifest.get("name") or "").strip()
+    if not mod_id:
+        raise SystemExit("Manifest must declare 'id' (or legacy 'pck_name').")
+    return mod_id
+
+
+def generate_import_artifacts(godot_exe: str, mod_id: str, source_image: Path, temp_prefix: str) -> tuple[Path, Path, str] | None:
     with tempfile.TemporaryDirectory() as temp_dir_raw:
         temp_dir = Path(temp_dir_raw)
-        mod_dir = temp_dir / mod_name
+        mod_dir = temp_dir / mod_id
         mod_dir.mkdir(parents=True, exist_ok=True)
 
         temp_image = mod_dir / "mod_image.png"
@@ -62,9 +74,9 @@ def generate_import_artifacts(godot_exe: str, mod_name: str, source_image: Path)
         (temp_dir / "project.godot").write_text(
             "config_version=5\n\n"
             "[application]\n"
-            "config/name=\"ModImageImport\"\n"
-            "config/features=PackedStringArray(\"4.5\")\n"
-            f"config/icon=\"res://{mod_name}/mod_image.png\"\n",
+            'config/name="ModImageImport"\n'
+            'config/features=PackedStringArray("4.5")\n'
+            f'config/icon="res://{mod_id}/mod_image.png"\n',
             encoding="utf-8",
         )
 
@@ -83,8 +95,7 @@ def generate_import_artifacts(godot_exe: str, mod_name: str, source_image: Path)
         if not wait_for_file(ctex_path):
             return None
 
-        # Copy into stable temp files because the context manager will delete this directory.
-        stable_root = Path(tempfile.mkdtemp(prefix="ascensionunlockmod_import_"))
+        stable_root = Path(tempfile.mkdtemp(prefix=f"{temp_prefix}_import_"))
         stable_import = stable_root / "mod_image.png.import"
         stable_ctex = stable_root / "mod_image.ctex"
         shutil.copy2(import_file, stable_import)
@@ -117,21 +128,23 @@ def parse_ctex_path(import_text: str) -> str | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Pack AscensionUnlockMod.pck")
+    parser = argparse.ArgumentParser(description="Pack a STS2 mod PCK")
     parser.add_argument("out_pck", nargs="?", default="")
     args = parser.parse_args()
 
     script_dir = Path(__file__).resolve().parent
     project_root = script_dir.parent.parent
 
-    mod_name = os.environ.get("MOD_BASENAME", "AscensionUnlockMod")
     manifest_path = Path(os.environ.get("MANIFEST_PATH", str(project_root / "mod_manifest.json"))).resolve()
-    out_pck = Path(args.out_pck).resolve() if args.out_pck else (project_root / f"{mod_name}.pck").resolve()
-    dist_dir = project_root / "dist" / mod_name
-    root_pck = (project_root / f"{mod_name}.pck").resolve()
-
     if not manifest_path.exists():
         raise SystemExit(f"Missing manifest: {manifest_path}")
+
+    manifest = read_manifest(manifest_path)
+    mod_id = resolve_mod_id(manifest)
+    out_pck = Path(args.out_pck).resolve() if args.out_pck else (project_root / f"{mod_id}.pck").resolve()
+    dist_dir = project_root / "dist" / mod_id
+    root_pck = (project_root / f"{mod_id}.pck").resolve()
+    root_json = (project_root / f"{mod_id}.json").resolve()
 
     godot_exe = find_godot(project_root)
     image_path = resolve_image_path(project_root)
@@ -147,7 +160,12 @@ def main() -> None:
         if image_path and image_path.exists():
             cmd.append(str(image_path))
 
-            import_bundle = generate_import_artifacts(godot_exe, mod_name, image_path)
+            import_bundle = generate_import_artifacts(
+                godot_exe,
+                mod_id,
+                image_path,
+                temp_prefix=project_root.name.lower().replace(" ", "_")
+            )
             if import_bundle:
                 import_path, ctex_path, ctex_rel = import_bundle
                 cleanup_dir = import_path.parent
@@ -160,13 +178,19 @@ def main() -> None:
 
         if out_pck != root_pck:
             shutil.copy2(out_pck, root_pck)
-        shutil.copy2(out_pck, dist_dir / f"{mod_name}.pck")
-        shutil.copy2(manifest_path, dist_dir / "mod_manifest.json")
+        shutil.copy2(out_pck, dist_dir / f"{mod_id}.pck")
+        shutil.copy2(manifest_path, dist_dir / f"{mod_id}.json")
+        shutil.copy2(manifest_path, root_json)
+
+        stale_manifest = dist_dir / "mod_manifest.json"
+        if stale_manifest.exists():
+            stale_manifest.unlink()
 
         print("PCK created:")
         print(f"  {out_pck}")
         print("Staged in:")
-        print(f"  {dist_dir / f'{mod_name}.pck'}")
+        print(f"  {dist_dir / f'{mod_id}.pck'}")
+        print(f"  {dist_dir / f'{mod_id}.json'}")
     finally:
         if cleanup_dir and cleanup_dir.exists():
             shutil.rmtree(cleanup_dir, ignore_errors=True)
