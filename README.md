@@ -24,6 +24,7 @@ Install and enable ModManagerSettings before installing this mod.
 7. Confirm these files are present in `mods/AscensionUnlockMod`:
    - `AscensionUnlockMod.dll`
    - `AscensionUnlockMod.pck`
+   - `AscensionUnlockMod.json`
 8. Launch Slay the Spire 2. If prompted to enable mods, accept and relaunch.
 9. In-game, go to `Settings` -> `General` -> `Mods` and enable both `ModManagerSettings` and `AscensionUnlockMod`.
 

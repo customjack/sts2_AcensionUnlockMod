@@ -10,3 +10,5 @@ __pycache__/
 *.log
 # local developer config (never commit)
 /.env
+/decompile
+/tmp
